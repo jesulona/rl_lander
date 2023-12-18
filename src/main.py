@@ -7,40 +7,68 @@ import matplotlib.pyplot as plt
 from dqn.dqn import DQNAgent
 from dueling_dqn.dueling_dqn import DuelingDQNAgent
 
+# def train_agent(agent, env, episodes):
+#     rewards = []
+#     for e in range(episodes):
+#         state, _ = env.reset(seed=42)
+        
+#         # Ensure the state is an array and reshape it
+#         state = np.array(state).reshape(1, -1)
+#         total_reward = 0
+
+#         for time_step in range(500):
+#             action = agent.act(state)
+#             step = env.step(action)
+#             #print(step)
+#             next_state, reward, terminated, truncated, _ = step
+            
+#             # Reshape the next_state similarly
+#             next_state = np.array(next_state).reshape(1, -1)
+
+#             agent.remember(state, action, reward, next_state, terminated or truncated)
+#             state = next_state
+#             total_reward += reward
+
+#             if terminated or truncated:
+#                 break
+
+#             agent.replay(32)
+
+#         # Decay epsilon after each episode
+#         agent.epsilon = max(agent.epsilon_min, agent.epsilon_decay * agent.epsilon)
+#         print(f"Episode: {e}, Epsilon: {agent.epsilon}, Reward: {total_reward}")
+#         rewards.append(total_reward)
+    
+#     return rewards
+
+
 def train_agent(agent, env, episodes):
     rewards = []
     for e in range(episodes):
         state, _ = env.reset(seed=42)
-        
-        # Ensure the state is an array and reshape it
         state = np.array(state).reshape(1, -1)
         total_reward = 0
 
         for time_step in range(500):
             action = agent.act(state)
-            step = env.step(action)
-            #print(step)
-            next_state, reward, terminated, truncated, _ = step
-            
-            # Reshape the next_state similarly
+            next_state, reward, terminated, truncated, _ = env.step(action)
             next_state = np.array(next_state).reshape(1, -1)
 
-            agent.remember(state, action, reward, next_state, terminated or truncated)
+            # Use 'step' instead of 'remember' and 'replay'
+            agent.step(state, action, reward, next_state, terminated or truncated)
+
             state = next_state
             total_reward += reward
 
             if terminated or truncated:
                 break
 
-            agent.replay(32)
-
         # Decay epsilon after each episode
         agent.epsilon = max(agent.epsilon_min, agent.epsilon_decay * agent.epsilon)
         print(f"Episode: {e}, Epsilon: {agent.epsilon}, Reward: {total_reward}")
         rewards.append(total_reward)
-    
-    return rewards
 
+    return rewards
 
 def plot_rewards(rewards_dqn, rewards_dueling_dqn):
     plt.plot(rewards_dqn, label='DQN')
@@ -62,8 +90,8 @@ if __name__ == "__main__":
     dueling_dqn_agent = DuelingDQNAgent(state_size, action_size, seed)
 
     episodes = 10
-    rewards_dqn = train_agent(dqn_agent, env, episodes)
-    #rewards_dueling_dqn = train_agent(dueling_dqn_agent, env, episodes)
+    #rewards_dqn = train_agent(dqn_agent, env, episodes)
+    rewards_dueling_dqn = train_agent(dueling_dqn_agent, env, episodes)
 
     #plot_rewards(rewards_dqn, rewards_dueling_dqn)
 
