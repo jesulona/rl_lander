@@ -6,99 +6,117 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dqn.dqn import DQNAgent
 from dueling_dqn.dueling_dqn import DuelingDQNAgent
+from ddqn.ddqn import DDQNAgent
+from ppo.ppo import PPOAgent
 
-# def train_agent(agent, env, episodes):
+# def train_agent(agent, env, episodes, update_timestep=2000):
 #     rewards = []
+#     timestep = 0
+
 #     for e in range(episodes):
 #         state, _ = env.reset(seed=42)
-        
-#         # Ensure the state is an array and reshape it
 #         state = np.array(state).reshape(1, -1)
 #         total_reward = 0
 
 #         for time_step in range(500):
-#             action = agent.act(state)
-#             step = env.step(action)
-#             #print(step)
-#             next_state, reward, terminated, truncated, _ = step
-            
-#             # Reshape the next_state similarly
-#             next_state = np.array(next_state).reshape(1, -1)
+#             if isinstance(agent, PPOAgent):
+#                 action, log_prob = agent.select_action(state)
+#                 next_state, reward, terminated, truncated, _ = env.step(action)
+#                 next_state = np.array(next_state).reshape(1, -1)
+#                 agent.step(state, action, log_prob, reward, terminated or truncated)
+#             else:
+#                 action = agent.act(state)
+#                 next_state, reward, terminated, truncated, _ = env.step(action)
+#                 next_state = np.array(next_state).reshape(1, -1)
+#                 agent.step(state, action, reward, next_state, terminated or truncated)
 
-#             agent.remember(state, action, reward, next_state, terminated or truncated)
 #             state = next_state
 #             total_reward += reward
+#             timestep += 1
 
 #             if terminated or truncated:
 #                 break
 
-#             agent.replay(32)
+#             if isinstance(agent, PPOAgent) and timestep % update_timestep == 0:
+#                 agent.update()
 
-#         # Decay epsilon after each episode
-#         agent.epsilon = max(agent.epsilon_min, agent.epsilon_decay * agent.epsilon)
-#         print(f"Episode: {e}, Epsilon: {agent.epsilon}, Reward: {total_reward}")
+#         if not isinstance(agent, PPOAgent):
+#             agent.epsilon = max(agent.epsilon_min, agent.epsilon_decay * agent.epsilon)
+
+#         print(f"Episode: {e}, Reward: {total_reward}")
 #         rewards.append(total_reward)
-    
-#     return rewards
 
-
+    # return rewards
 def train_agent(agent, env, episodes):
     rewards = []
     for e in range(episodes):
-        state, _ = env.reset(seed=42)
+        state, _ = env.reset(seed=40)
         state = np.array(state).reshape(1, -1)
         total_reward = 0
-
-        for time_step in range(500):
+        for time_step in range(1000):
             action = agent.act(state)
             next_state, reward, terminated, truncated, _ = env.step(action)
             next_state = np.array(next_state).reshape(1, -1)
-
-            # Use 'step' instead of 'remember' and 'replay'
             agent.step(state, action, reward, next_state, terminated or truncated)
-
             state = next_state
             total_reward += reward
-
             if terminated or truncated:
                 break
-
         # Decay epsilon after each episode
         agent.epsilon = max(agent.epsilon_min, agent.epsilon_decay * agent.epsilon)
         print(f"Episode: {e}, Epsilon: {agent.epsilon}, Reward: {total_reward}")
         rewards.append(total_reward)
-
     return rewards
 
-def plot_rewards(rewards_dqn, rewards_dueling_dqn):
+
+def plot_rewards(rewards_dqn, rewards_ddqn):
     plt.plot(rewards_dqn, label='DQN')
-    plt.plot(rewards_dueling_dqn, label='Dueling DQN')
+    plt.plot(rewards_ddqn, label='DDQN')
     plt.xlabel('Episode')
     plt.ylabel('Reward')
     plt.legend()
     plt.show()
 
 if __name__ == "__main__":
-    env = gym.make("LunarLander-v2", render_mode="human")
+    env = gym.make("LunarLander-v2", render_mode=None)
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 
     # Define a seed for reproducibility
-    seed = 42
+    seed = 40
+
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(device)
+    dqn_agent = DQNAgent(state_size, action_size, seed, device)
 
     dqn_agent = DQNAgent(state_size, action_size, seed)
     dueling_dqn_agent = DuelingDQNAgent(state_size, action_size, seed)
+    #ddqn_agent = DDQNAgent(state_size,action_size,seed)
+    ddqn_agent = DDQNAgent(state_size,action_size,seed,device)
+    ppo_agent = PPOAgent(state_size, action_size)
 
-    episodes = 10
-    #rewards_dqn = train_agent(dqn_agent, env, episodes)
-    rewards_dueling_dqn = train_agent(dueling_dqn_agent, env, episodes)
 
-    #plot_rewards(rewards_dqn, rewards_dueling_dqn)
+
+    episodes = 1000
+    rewards_dqn = train_agent(dqn_agent, env, episodes)
+    #rewards_dueling_dqn = train_agent(dueling_dqn_agent, env, episodes)
+    rewards_ddqn = train_agent(ddqn_agent, env, episodes)
+    #rewards_ppo = train_agent(ppo_agent, env, episodes)
+
+
+    plot_rewards(rewards_dqn, rewards_ddqn)
+    # plt.plot(rewards_dqn, label='dqn')
+    # plt.xlabel('Episode')
+    # plt.ylabel('Reward')
+    # plt.show()
+
 
   # Save models
     model_data = [
         ("dqn", dqn_agent.qnetwork),
-        ("dueling_dqn", dueling_dqn_agent.qnetwork_local)
+        ("ddqn", ddqn_agent.qnetwork_local)
+        #("dueling_dqn", dueling_dqn_agent.qnetwork_local)
     ]
 
     # Assuming 'model_data' contains tuples of (model_name, model_object)

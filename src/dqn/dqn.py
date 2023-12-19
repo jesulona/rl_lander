@@ -15,7 +15,8 @@ class QNetwork(nn.Module):
         self.fc2 = nn.Linear(64, 64)
         self.fc3 = nn.Linear(64, action_size)
         # Initialize memory (replay buffer)
-        self.memory = deque(maxlen=int(1e5))
+        #self.memory = deque(maxlen=int(1e5))
+        
         
     def forward(self, state):
         x = F.relu(self.fc1(state))
@@ -23,37 +24,46 @@ class QNetwork(nn.Module):
         return self.fc3(x)
 
 class DQNAgent:
-    def __init__(self, state_size, action_size, seed):
+    def __init__(self, state_size, action_size, seed, device= "cpu"):
+        self.device = device
+        #self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.state_size = state_size
         self.action_size = action_size
         self.seed = random.seed(seed)
         
-        self.qnetwork = QNetwork(state_size, action_size, seed)
-        self.optimizer = optim.Adam(self.qnetwork.parameters(), lr=5e-4)
+        self.qnetwork = QNetwork(state_size, action_size, seed).to(self.device)
+        self.optimizer = optim.Adam(self.qnetwork.parameters(), lr=9e-4)
 
-        self.memory = deque(maxlen=int(1e5))
-        self.batch_size = 64
+        self.memory = deque(maxlen=int(1e6))
+        self.batch_size = 64 *2
         self.gamma = 0.99
         self.update_every = 4
         self.t_step = 0
 
         #random
-        self.epsilon = 0.1  # Initial epsilon
+        self.epsilon = 1.0  # Initial epsilon
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
 
     def step(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
-        print("step")
+        state = torch.from_numpy(state).float().to(self.device)
+        next_state = torch.from_numpy(next_state).float().to(self.device)
+        action = torch.tensor(action).to(self.device)
+        reward = torch.tensor(reward).to(self.device)
+        done = torch.tensor(done).to(self.device)
+        self.memory.append((state.cpu().numpy(), action.cpu().item(), reward.cpu().item(), next_state.cpu().numpy(), done.cpu().item()))
+        #self.memory.append((state, action, reward, next_state, done))
+        #print("step")
         self.t_step = (self.t_step + 1) % self.update_every
         if self.t_step == 0 and len(self.memory) > self.batch_size:
-            print("learned")
+            #print("learned")
             experiences = random.sample(self.memory, k=self.batch_size)
             self.learn(experiences, self.gamma)
 
     def act(self, state, eps=0.0):
         eps = self.epsilon
-        state = torch.from_numpy(state).float().unsqueeze(0)
+        #state = torch.from_numpy(state).float().unsqueeze(0)
+        state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
         self.qnetwork.eval()
         with torch.no_grad():
             action_values = self.qnetwork(state)
@@ -65,14 +75,34 @@ class DQNAgent:
         else:
             return random.choice(np.arange(self.action_size))
 
+    # def learn(self, experiences, gamma):
+    #     states, actions, rewards, next_states, dones = zip(*experiences)
+
+    #     states = torch.from_numpy(np.vstack(states)).float()
+    #     actions = torch.from_numpy(np.vstack(actions)).long()
+    #     rewards = torch.from_numpy(np.vstack(rewards)).float()
+    #     next_states = torch.from_numpy(np.vstack(next_states)).float()
+    #     dones = torch.from_numpy(np.vstack(dones).astype(np.uint8)).float()
+
+    #     Q_targets_next = self.qnetwork(next_states).detach().max(1)[0].unsqueeze(1)
+    #     Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
+    #     Q_expected = self.qnetwork(states).gather(1, actions)
+
+    #     #loss = F.mse_loss(Q_expected, Q_targets)
+    #     loss = F.smooth_l1_loss(Q_expected, Q_targets)
+    #     self.optimizer.zero_grad()
+    #     loss.backward()
+    #     torch.nn.utils.clip_grad_norm_(self.qnetwork.parameters(), 1.0)  # 1.0 is the clip value, can be adjusted
+    #     self.optimizer.step()
+
     def learn(self, experiences, gamma):
         states, actions, rewards, next_states, dones = zip(*experiences)
 
-        states = torch.from_numpy(np.vstack(states)).float()
-        actions = torch.from_numpy(np.vstack(actions)).long()
-        rewards = torch.from_numpy(np.vstack(rewards)).float()
-        next_states = torch.from_numpy(np.vstack(next_states)).float()
-        dones = torch.from_numpy(np.vstack(dones).astype(np.uint8)).float()
+        states = torch.from_numpy(np.vstack(states)).float().to(self.device)
+        actions = torch.from_numpy(np.vstack(actions)).long().to(self.device)
+        rewards = torch.from_numpy(np.vstack(rewards)).float().to(self.device)
+        next_states = torch.from_numpy(np.vstack(next_states)).float().to(self.device)
+        dones = torch.from_numpy(np.vstack(dones).astype(np.uint8)).float().to(self.device)
 
         Q_targets_next = self.qnetwork(next_states).detach().max(1)[0].unsqueeze(1)
         Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
@@ -81,54 +111,13 @@ class DQNAgent:
         loss = F.mse_loss(Q_expected, Q_targets)
         self.optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.qnetwork.parameters(), 5.0)
         self.optimizer.step()
+
 
     def remember(self, state, action, reward, next_state, done):
         """Store experience in replay memory."""
         experience = (state, action, reward, next_state, done)
         self.memory.append(experience)
 
-    def replay(self, batch_size):
-        """Retrieve a batch of experiences from memory and learn from them."""
-        if len(self.memory) < batch_size:
-            return
-
-        minibatch = random.sample(self.memory, batch_size)
-        
-        # Efficient conversion to numpy arrays
-        states = np.array([e[0] for e in minibatch])
-        actions = np.array([e[1] for e in minibatch])
-        rewards = np.array([e[2] for e in minibatch])
-        next_states = np.array([e[3] for e in minibatch])
-        dones = np.array([e[4] for e in minibatch])
-
-        # Converting numpy arrays to tensors
-        states = torch.tensor(states, dtype=torch.float32)
-        actions = torch.tensor(actions, dtype=torch.long).unsqueeze(-1)
-        rewards = torch.tensor(rewards, dtype=torch.float32)
-        next_states = torch.tensor(next_states, dtype=torch.float32)
-        dones = torch.tensor(dones, dtype=torch.float32)
-
-        # Reshape states and next_states to remove the extra dimension
-        states = states.squeeze(1)
-        next_states = next_states.squeeze(1)
-
-        #print("Corrected Shapes - states: {}, next_states: {}".format(states.shape, next_states.shape))
-
-        # Compute Q targets for next states
-        Q_targets_next = self.qnetwork(next_states).detach().max(1)[0].unsqueeze(-1)
-
-        # Compute Q targets for current states
-        Q_targets = rewards.unsqueeze(-1) + (self.gamma * Q_targets_next * (1 - dones.unsqueeze(-1)))
-
-        # Printing shapes before the line that causes the error
-        #print("Corrected Shapes - Q_targets: {}, actions: {}".format(Q_targets.shape, actions.shape))
-
-        # Get expected Q values from local model
-        Q_expected = self.qnetwork(states).gather(1, actions)
-
-        # Compute loss
-        loss = F.mse_loss(Q_expected, Q_targets)
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+  

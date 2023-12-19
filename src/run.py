@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from dqn.dqn import DQNAgent
 from dueling_dqn.dueling_dqn import DuelingDQNAgent
+from ddqn.ddqn import DDQNAgent
 
 def initialize_pygame():
     pygame.init()
@@ -36,11 +37,12 @@ def load_model(model_path, agent_class, state_size, action_size, seed):
 def run_episodes(env, agent, n_episodes):
     total_rewards = []
     for episode in range(n_episodes):
-        state, _ = env.reset(seed=42)
+        state, _ = env.reset(seed=40)
         total_reward = 0
         while True:
             action = agent.act(state, eps=0.0)
             next_state, reward, terminated, truncated, _ = env.step(action)
+            next_state = np.array(next_state).reshape(1, -1)
             total_reward += reward
             state = next_state
             if terminated or truncated:
@@ -54,7 +56,7 @@ if __name__ == "__main__":
     state_size = 8
     action_size = 4
     seed = 42
-    n_episodes = 1
+    n_episodes = 20
 
     initialize_pygame()
 
@@ -70,13 +72,13 @@ if __name__ == "__main__":
     quit_pygame()
     initialize_pygame()
 
-    # Load and run Dueling DQN agent
-    dueling_dqn_model_path = "src/dueling_dqn/models/model.pth"
-    dueling_dqn_agent = load_model(dueling_dqn_model_path, DuelingDQNAgent, state_size, action_size, seed)
+    # Load and run DDQN agent
+    ddqn_model_path = "src/ddqn/models/model.pth"
+    ddqn_agent = load_model(ddqn_model_path, DDQNAgent, state_size, action_size, seed)
     env = gym.make(env_name, render_mode="human")
     print("Running Dueling DQN agent...")
-    average_reward_dueling_dqn = run_episodes(env, dueling_dqn_agent, n_episodes)
-    print(f"Average Reward for Dueling DQN: {average_reward_dueling_dqn}")
+    average_reward_ddqn = run_episodes(env, ddqn_agent, n_episodes)
+    print(f"Average Reward for DDQN: {average_reward_ddqn}")
     env.close()
 
     quit_pygame()

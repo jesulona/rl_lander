@@ -56,18 +56,21 @@ class DuelingDQNAgent:
         # Dueling Q-Network
         self.qnetwork_local = DuelingQNetwork(state_size, action_size, seed)
         self.qnetwork_target = DuelingQNetwork(state_size, action_size, seed)
-        self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=1e-4)
+        self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=5e-3)
 
         # Replay memory
         self.memory = deque(maxlen=int(1e5))
-        self.batch_size = 64
+        self.batch_size = 64*2
         self.gamma = 0.99
-        self.tau = 1e-3
+        #self.tau = 1e-3 
+        # Increase tau to allow for faster updates to the target network
+        self.tau = 5e-3  # or you could try 1e-2
+
         self.update_every = 4
         self.t_step = 0
 
         #random
-        self.epsilon = 0.1  # Initial epsilon
+        self.epsilon = 1.0  # Initial epsilon
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
 
@@ -109,7 +112,7 @@ class DuelingDQNAgent:
             return selected_action
 
         # Debug: Print updated epsilon value
-        print(f"Updated Epsilon: {self.epsilon}")
+        #print(f"Updated Epsilon: {self.epsilon}")
 
 
 
@@ -148,6 +151,7 @@ class DuelingDQNAgent:
 
         # ------------------- update target network ------------------- #
         self.soft_update(self.qnetwork_local, self.qnetwork_target, self.tau)
+        #print(f"Loss: {loss.item()}")  # Print the loss valu
                     
 
     def soft_update(self, local_model, target_model, tau):
@@ -161,43 +165,46 @@ class DuelingDQNAgent:
         self.memory.append(experience)
 
 
-    def replay(self, batch_size):
-        """Retrieve a batch of experiences from memory and learn from them."""
-        if len(self.memory) < batch_size:
-            return
+#     def replay(self, batch_size):
+#         """Retrieve a batch of experiences from memory and learn from them."""
+#         if len(self.memory) < batch_size:
+#             return
 
-        minibatch = random.sample(self.memory, batch_size)
+#         minibatch = random.sample(self.memory, batch_size)
 
-        states = np.array([e[0] for e in minibatch])
-        actions = np.array([e[1] for e in minibatch])
-        rewards = np.array([e[2] for e in minibatch])
-        next_states = np.array([e[3] for e in minibatch])
-        dones = np.array([e[4] for e in minibatch])
+#         states = np.array([e[0] for e in minibatch])
+#         actions = np.array([e[1] for e in minibatch])
+#         rewards = np.array([e[2] for e in minibatch])
+#         next_states = np.array([e[3] for e in minibatch])
+#         dones = np.array([e[4] for e in minibatch])
 
-        states = torch.tensor(states, dtype=torch.float32)
-        actions = torch.tensor(actions, dtype=torch.long).unsqueeze(-1)
-        rewards = torch.tensor(rewards, dtype=torch.float32)
-        next_states = torch.tensor(next_states, dtype=torch.float32)
-        dones = torch.tensor(dones, dtype=torch.float32)
+#         states = torch.tensor(states, dtype=torch.float32)
+#         actions = torch.tensor(actions, dtype=torch.long).unsqueeze(-1)
+#         rewards = torch.tensor(rewards, dtype=torch.float32)
+#         next_states = torch.tensor(next_states, dtype=torch.float32)
+#         dones = torch.tensor(dones, dtype=torch.float32)
 
-        # Reshape states and next_states to remove the extra dimension
-        states = states.squeeze(1)
-        next_states = next_states.squeeze(1)
+#         # Reshape states and next_states to remove the extra dimension
+#         states = states.squeeze(1)
+#         next_states = next_states.squeeze(1)
 
-        # Get max predicted Q values (for next states) from target model
-        Q_targets_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(-1)
-        # Compute Q targets for current states
-        Q_targets = rewards + (self.gamma * Q_targets_next * (1 - dones.unsqueeze(-1)))
+#         # Get max predicted Q values (for next states) from target model
+#         Q_targets_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(-1)
+#         # Compute Q targets for current states
+#         Q_targets = rewards + (self.gamma * Q_targets_next * (1 - dones.unsqueeze(-1)))
 
-        # Get expected Q values from local model
-        Q_expected = self.qnetwork_local(states).gather(1, actions)
+#         # Get expected Q values from local model
+#         Q_expected = self.qnetwork_local(states).gather(1, actions)
 
-        # Compute loss
-        loss = F.mse_loss(Q_expected, Q_targets)
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+#         # Compute loss
+#         loss = F.mse_loss(Q_expected, Q_targets)
+#         self.optimizer.zero_grad()
+#         loss.backward()
+#         self.optimizer.step()
 
-        # ------------------- update target network ------------------- #
-        self.soft_update(self.qnetwork_local, self.qnetwork_target, self.tau)                     
+#         print(f"Loss: {loss.item()}")  # Print the loss value
 
+#         # ------------------- update target network ------------------- #
+#         self.soft_update(self.qnetwork_local, self.qnetwork_target, self.tau)                     
+
+# ##
