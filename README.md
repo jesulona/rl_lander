@@ -16,7 +16,7 @@ To set up the project environment, ensure that you have `pip` installed and then
 
 ```bash
 pip install -r requirements.txt
-
+```
 ## Running the Training
 
 Once you have installed all required dependencies, you can start the training process. To run the code:
@@ -63,5 +63,4 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE) f
 
 ---
 
-Thank you for exploring the Lunar Lander Reinforcement Learning project. Happy learning and coding!
 
